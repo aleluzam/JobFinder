@@ -1,0 +1,117 @@
+Requisitos del agente de ofertas de empleo (España, multiusuario)
+Documento de requisitos por paso del flujo. Cada paso indica qué debe hacer, qué necesita, cómo se comprueba que funciona y qué riesgos tiene.
+
+0. Infraestructura base
+Objetivo: servidor listo, seguro y reproducible.
+
+Servidor: VPS con 6 vCPU, 12 GB RAM, 200 GB SSD (suficiente para cientos de usuarios).
+Software: Docker y Docker Compose, Postgres con extensión pgvector, Redis, Caddy (HTTPS automático).
+Seguridad: SSH solo con clave, ufw con puertos 22, 80 y 443, secretos en variables de entorno o .env fuera del repositorio.
+Operación: backups diarios de Postgres (pg_dump) a almacenamiento externo, snapshot antes de cada cambio grande, logs rotados.
+Dominio: un dominio propio apuntando al VPS (necesario para HTTPS y política de privacidad).
+Aceptación: docker compose up levanta todos los servicios y se restaura un backup en un entorno limpio.
+
+1. Ingesta de ofertas
+Objetivo: descargar ofertas de varias fuentes y normalizarlas a un único esquema.
+
+Fuentes candidatas: Adzuna, Jooble, InfoJobs, EURES. Comprobar si el SEPE ofrece datos abiertos o feed.
+Credenciales: claves o registro de aplicación en cada proveedor (InfoJobs exige registrar la app).
+Frecuencia: cada 4-6 horas, con tareas programadas en la cola.
+Esquema normalizado: source, source_id, título, empresa, provincia/localidad, contrato, jornada, sueldo (mín/máx si existe), descripción, URL original, fecha de publicación, fecha de captura.
+Consultas: agrupadas por provincia y categoría, no por usuario, para respetar límites de peticiones.
+Robustez: reintentos con espera creciente, timeouts, control de límites de cada API y registro de errores por fuente.
+Restricciones: no hacer scraping de LinkedIn ni Indeed; guardar siempre la URL original y enlazar a ella.
+Aceptación: una ejecución completa guarda ofertas normalizadas de al menos una fuente sin duplicar filas ni romper con campos vacíos.
+
+Riesgos: cambios en las APIs, límites de uso, condiciones que no permitan uso comercial (revisarlas antes de depender de una fuente).
+
+2. Deduplicación
+Objetivo: que la misma oferta no aparezca dos veces, aunque venga de agregadores distintos.
+
+Clave exacta: hash de la URL canónica (sin parámetros de seguimiento).
+Clave aproximada: hash de título normalizado + empresa + provincia.
+Caducidad: marcar como inactivas las ofertas antiguas (por ejemplo, más de 30-45 días o que desaparecen de la fuente).
+Almacenamiento: índice único en Postgres sobre la clave de deduplicación.
+Aceptación: reejecutar la ingesta no crea registros nuevos para ofertas ya vistas, y una oferta repetida en dos fuentes se guarda una sola vez.
+
+3. Embeddings de ofertas
+Objetivo: representar cada oferta como vector para comparar con perfiles de usuario.
+
+Modelo: multilingüe con buen soporte de español, ejecutado en local (por ejemplo multilingual-e5-small o bge-m3).
+Entrada: título + empresa + descripción recortada a una longitud fija.
+Cálculo: una sola vez por oferta nueva, en lotes, mediante la cola de tareas.
+Almacenamiento: columna vector en pgvector con índice HNSW o IVFFlat.
+Versionado: guardar qué modelo generó cada vector, para poder recalcular si se cambia.
+Aceptación: todas las ofertas activas tienen vector; una búsqueda de similitud devuelve resultados coherentes con el sector del perfil.
+
+Riesgos: consumo de CPU en cargas grandes (procesar en lotes y fuera de horas punta si hace falta).
+
+4. Perfiles de usuario y matching
+Objetivo: seleccionar, para cada usuario, un pequeño conjunto de candidatas relevantes.
+
+Datos de perfil
+
+Puestos o sectores deseados, provincia o radio, remoto sí/no, tipo de contrato, jornada, sueldo mínimo, idiomas, experiencia.
+Texto libre o resumen de CV (opcional) para generar el embedding del perfil.
+Proceso
+
+Filtros duros en SQL: provincia/radio, remoto, contrato, jornada, sueldo mínimo, ofertas activas y no enviadas antes.
+Similitud vectorial entre perfil y ofertas que pasan los filtros; quedarse con el top N (por ejemplo 20).
+Descartar pares usuario-oferta ya presentes en scores.
+Aceptación: para perfiles de sectores distintos (hostelería, sanidad, tecnología) el top N es coherente y respeta todos los filtros duros.
+
+Riesgos: ofertas sin sueldo o sin contrato informado (definir si se incluyen o no) y perfiles demasiado vagos.
+
+5. Puntuación con LLM
+Objetivo: valorar y explicar el encaje de las mejores candidatas.
+
+Modelo: API de pago económica (Claude Haiku o Gemini Flash). Las capas gratuitas suelen no cubrir uso comercial; confirmarlo en sus condiciones.
+Entrada: perfil estructurado + oferta; prompt corto con criterios claros.
+Salida: JSON validado con score (0-10), motivo (una línea) y alertas (requisitos que el usuario no cumple).
+Control de coste: solo el top N por usuario, caché en scores(user_id, job_id, score, motivo, model, fecha) y cuota diaria por usuario.
+Fallos: reintentos, validación del JSON y valor por defecto si el modelo no responde.
+Seguridad: tratar el texto de las ofertas como datos no confiables; el prompt debe indicar que se ignoren instrucciones incluidas en ellas.
+Aceptación: el 100 % de las respuestas se guardan con formato válido, y ningún par usuario-oferta se puntúa dos veces.
+
+6. Notificaciones
+Objetivo: avisar solo cuando merezca la pena.
+
+Canales: bot de Telegram (por ejemplo con aiogram) y email (Resend o Brevo; revisar límites del plan gratuito).
+Umbral: enviar solo ofertas con puntuación igual o superior a un valor configurable por usuario.
+Contenido: título, empresa, provincia, puntuación, motivo en una línea y enlace a la oferta original.
+Reglas: no repetir ofertas, máximo de avisos por día, horario de envío configurable y agrupación en un solo mensaje.
+Registro: guardar qué se envió y cuándo.
+Aceptación: un usuario recibe como máximo un resumen por franja, sin duplicados, y puede pausar o cancelar los avisos.
+
+7. Onboarding, cuentas y planes
+Objetivo: que un usuario nuevo pueda registrarse y configurarse sin ayuda.
+
+Registro: /start en Telegram guarda el chat_id; email verificado como alternativa.
+Cuestionario guiado: con botones (puesto, provincia, contrato, jornada, sueldo, remoto) para no depender de texto libre.
+Gestión: comandos para editar el perfil, pausar, cambiar umbral y borrar la cuenta.
+Planes: gratuito (cuota baja de puntuaciones al día) y de pago (más cuota), con límites aplicados en base de datos.
+Aislamiento: ninguna consulta puede mezclar datos de usuarios distintos.
+Interfaz web: opcional en una primera versión.
+Aceptación: un usuario nuevo completa el alta en menos de 3 minutos y empieza a recibir ofertas en el siguiente ciclo.
+
+8. Requisitos legales y de privacidad (RGPD y LOPDGDD)
+Consentimiento explícito para tratar datos personales y, si se guardan, CV.
+Política de privacidad y aviso legal accesibles, con identificación del responsable del tratamiento.
+Derechos: acceso, rectificación y borrado; el borrado debe eliminar perfil, vectores y puntuaciones.
+Minimización: guardar solo lo necesario; valorar no almacenar el CV original, solo un resumen.
+Seguridad: cifrado en tránsito (HTTPS) y en reposo para datos sensibles, accesos restringidos y backups protegidos.
+Proveedores: si el LLM recibe datos del perfil, revisar sus condiciones y si usa los datos para entrenar; informar al usuario.
+Fuentes: respetar los términos de cada API sobre uso comercial y redistribución; enlazar a la oferta original.
+Recomendación: consultar con un profesional o con la guía de la AEPD antes de abrirlo al público.
+9. Monitorización y calidad
+Métricas: ofertas ingeridas por fuente, tasa de duplicados, tiempo por etapa, coste diario de LLM, avisos enviados, errores.
+Alertas: fallo de una fuente, cola atascada, coste por encima del presupuesto.
+Calidad del matching: botones de feedback (útil / no útil) en cada aviso para ajustar el umbral y los prompts.
+Orden de construcción recomendado
+Fase	Contenido	Resultado
+1	Pasos 0, 1 y 2	Base de datos con ofertas limpias de una fuente
+2	Pasos 3 y 4	Matching por embeddings para un perfil
+3	Pasos 5 y 6	Puntuación con LLM y avisos por Telegram
+4	Paso 7	Multiusuario, cuotas y planes
+5	Pasos 8 y 9	Requisitos legales, monitorización y apertura al público
+Las condiciones, límites y precios de las APIs cambian: confírmalos en la documentación oficial de cada proveedor antes de comprometerte con una fuente.
