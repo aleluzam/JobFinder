@@ -260,19 +260,19 @@ CREATE INDEX idx_notif_user_job ON notifications_log(user_id, job_id);
   - [ ] Configurar acceso SSH por clave pública y deshabilitar login por contraseña (`PasswordAuthentication no`).
   - [ ] Configurar firewall `ufw` permitiendo únicamente: puerto SSH (22 o personalizado), HTTP (80) y HTTPS (443).
   - [ ] Instalar Docker Engine y Docker Compose plugin en Ubuntu 22.04/24.04.
-- [ ] **0.2. Definición del `docker-compose.yml`**
-  - [ ] Contenedor `postgres`: imagen oficial con `pgvector` (`pgvector/pgvector:pg16`).
-  - [ ] Contenedor `redis`: `redis:7-alpine` para cola de mensajes y caché.
-  - [ ] Contenedor `caddy`: reverse proxy con HTTPS automático hacia el backend/webhook.
-  - [ ] Contenedor `app`: backend en Python (FastAPI / Workers).
-  - [ ] Configurar volúmenes persistentes (`pg_data`, `caddy_data`, `redis_data`).
-- [ ] **0.3. Gestión de Secretos y Configuración**
-  - [ ] Crear plantilla `.env.example` con variables documentadas:
+- [x] **0.2. Definición del `docker-compose.yml`**
+  - [x] Contenedor `postgres`: imagen oficial con `pgvector` (`pgvector/pgvector:pg16`).
+  - [x] Contenedor `redis`: `redis:7-alpine` para cola de mensajes y caché.
+  - [x] Contenedor `caddy`: reverse proxy con HTTPS automático hacia el backend/webhook.
+  - [x] Contenedor `app`: backend en Python (FastAPI / Workers).
+  - [x] Configurar volúmenes persistentes (`pg_data`, `caddy_data`, `redis_data`).
+- [x] **0.3. Gestión de Secretos y Configuración**
+  - [x] Crear plantilla `.env.example` con variables documentadas:
     - Credenciales de Postgres y Redis.
     - Claves de APIs de empleo (Adzuna, Jooble, InfoJobs).
     - API keys de LLM (Gemini / Claude).
     - Token de Telegram Bot.
-  - [ ] Añadir `.env` estricto en `.gitignore`.
+  - [x] Añadir `.env` estricto en `.gitignore`.
 - [ ] **0.4. Estrategia de Backups Automáticos**
   - [ ] Crear script bash `backup.sh` que ejecute `docker exec postgres pg_dump -U ... | gzip > /backups/...`.
   - [ ] Añadir cron diario a las 03:00 AM para rotar copias de seguridad de los últimos 7 días.

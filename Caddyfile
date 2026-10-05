@@ -1,0 +1,24 @@
+{
+    # Configuración global
+    email {$CADDY_EMAIL:admin@example.com}
+    admin off
+}
+
+{$DOMAIN_NAME:localhost} {
+    # Reverse proxy hacia el backend FastAPI
+    reverse_proxy app:8000
+
+    # Cabeceras de seguridad
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Logs
+    log {
+        output stdout
+        format console
+    }
+}
