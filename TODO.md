@@ -19,16 +19,16 @@ flowchart TB
 
     subgraph Core ["Servidor / VPS (Docker Compose)"]
         direction TB
-        
+
         Caddy["Caddy (Reverse Proxy / HTTPS)"]
-        
+
         subgraph Services ["Servicios de Backend"]
             FastAPI["API Backend / Webhooks (FastAPI)"]
             Scheduler["Scheduler / Cron (Celery Beat / ARQ)"]
             Worker["Workers Asíncronos (Ingesta, Embeddings, LLM)"]
             TgBot["Bot de Telegram (Aiogram 3.x)"]
         end
-        
+
         subgraph Storage ["Almacenamiento y Estado"]
             PG[("PostgreSQL 16 + pgvector")]
             Redis[("Redis (Cola de tareas + Caché)")]
@@ -67,13 +67,13 @@ flowchart TD
     FetchAPI --> ValidateHTTP{"¿Respuesta OK?"}
     ValidateHTTP -- No --> Retry["Reintento con Backoff Exponencial / Log error"]
     ValidateHTTP -- Sí --> ParseRaw["Parsear JSON específico de la fuente"]
-    
+
     ParseRaw --> Normalize["Normalizar a Esquema Común (Pydantic JobSchema)"]
     Normalize --> CleanURL["Limpiar URL (remover UTMs, query params de tracking)"]
     CleanURL --> CalcHashes["Generar Hashes:
     - canonical_hash = SHA256(canonical_url)
     - fuzzy_hash = SHA256(slug(title) + slug(company) + province)"]
-    
+
     CalcHashes --> CheckExact{"¿Existe canonical_hash o fuzzy_hash en DB?"}
     CheckExact -- Sí (Duplicado) --> UpdateSeen["Actualizar last_seen_at"]
     CheckExact -- No (Nueva) --> InsertDB["Insertar en DB (status: 'pending_embedding')"]
@@ -89,7 +89,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     MatchTrigger["Trigger de Matching (Nueva oferta o ciclo programado)"] --> ActiveUsers["Obtener usuarios activos con alertas configuradas"]
-    
+
     subgraph Stage1 ["Etapa 1: Filtros Duros (SQL en Postgres)"]
         ActiveUsers --> FilterProv["1. Coincidencia de Provincia / Modalidad Remota"]
         FilterProv --> FilterContract["2. Tipo de Contrato y Jornada requeridos"]
@@ -131,10 +131,10 @@ flowchart TD
 stateDiagram-v2
     [*] --> Start: Usuario envía /start
     Start --> AceptacionPrivacidad: Presentar términos y política RGPD
-    
+
     AceptacionPrivacidad --> Cancelado: Pulsa "Rechazar"
     Cancelado --> [*]
-    
+
     AceptacionPrivacidad --> SeleccionarPuestos: Pulsa "Acepto" (Guarda consentimiento con timestamp)
     SeleccionarPuestos --> SeleccionarProvincia: Escribe o selecciona puestos objetivo
     SeleccionarProvincia --> SeleccionarModalidad: Selecciona provincias (o "Toda España / Remoto")
@@ -143,7 +143,7 @@ stateDiagram-v2
     SeleccionarSalarioMin --> ResumenCV: Ingresa salario anual bruto mínimo (o "Indiferente")
     ResumenCV --> ConfigurarUmbral: (Opcional) Pega resumen de CV / Habilidades clave
     ConfigurarUmbral --> PerfilCompletado: Ajusta umbral de aviso (ej. 7/10 u 8/10)
-    
+
     PerfilCompletado --> GenerarVectorPerfil: Genera profile_embedding en segundo plano
     GenerarVectorPerfil --> Listo: Perfil Activo para Matching
     Listo --> [*]
@@ -256,10 +256,10 @@ CREATE INDEX idx_notif_user_job ON notifications_log(user_id, job_id);
 ### FASE 0: Cimientos de Infraestructura & Entorno Local/VPS
 > **Meta:** Tener un entorno Docker seguro, reproducible y listo para arrancar con un solo comando.
 
-- [ ] **0.1. Preparación del VPS y Seguridad Base**
-  - [ ] Configurar acceso SSH por clave pública y deshabilitar login por contraseña (`PasswordAuthentication no`).
-  - [ ] Configurar firewall `ufw` permitiendo únicamente: puerto SSH (22 o personalizado), HTTP (80) y HTTPS (443).
-  - [ ] Instalar Docker Engine y Docker Compose plugin en Ubuntu 22.04/24.04.
+- [x] **0.1. Preparación del VPS y Seguridad Base**
+  - [x] Configurar acceso SSH por clave pública y deshabilitar login por contraseña (`PasswordAuthentication no`).
+  - [x] Configurar firewall `ufw` permitiendo únicamente: puerto SSH (22 o personalizado), HTTP (80) y HTTPS (443).
+  - [x] Instalar Docker Engine y Docker Compose plugin en Ubuntu 22.04/24.04.
 - [x] **0.2. Definición del `docker-compose.yml`**
   - [x] Contenedor `postgres`: imagen oficial con `pgvector` (`pgvector/pgvector:pg16`).
   - [x] Contenedor `redis`: `redis:7-alpine` para cola de mensajes y caché.
@@ -286,8 +286,8 @@ CREATE INDEX idx_notif_user_job ON notifications_log(user_id, job_id);
 > **Meta:** Descargar ofertas de al menos una fuente externa, mapearlas a un modelo Pydantic unificado y almacenarlas de forma limpia.
 
 - [ ] **1.1. Obtención de Credenciales de Fuentes**
-  - [ ] Registro en **Adzuna API** (App ID y App Key para España `country=es`).
-  - [ ] Registro en **Jooble API** (API Key).
+  - [x] Registro en **Adzuna API** "d5435f73f7d49abffc135ec2a62721a7" (App ID y App Key para España `country=es`).
+  - [x] Registro en **Jooble API** "8a404450-13a5-4980-aead-1016c9009c03" (API Key).
   - [ ] (Opcional en fase inicial) Registro de aplicación en **InfoJobs Developer Portal**.
 - [ ] **1.2. Módulo de Esquema Común (`schemas/job.py`)**
   - [ ] Crear modelo Pydantic `RawJob` y `NormalizedJob` con validadores de tipos:
@@ -450,18 +450,18 @@ CREATE INDEX idx_notif_user_job ON notifications_log(user_id, job_id);
   - [ ] Diseñar plantilla clara y legible en MarkdownV2 o HTML:
     ```text
     🎯 Nueva oferta compatible (Puntuación: 8.5/10)
-    
+
     💼 Puesto: Senior Python Developer
     🏢 Empresa: Tech Solutions S.L.
     📍 Ubicación: Madrid (Híbrido)
     💰 Sueldo: 40.000€ - 50.000€
-    
+
     💡 Por qué te encaja:
     Coincide con tu experiencia en FastAPI y PostgreSQL. Piden 4 años de experiencia.
-    
+
     ⚠️ Requisitos que podrían faltar:
     - Conocimientos de Kubernetes
-    
+
     🔗 [Ver oferta completa en la fuente original](https://...)
     ```
 - [ ] **7.2. Botones de Interacción (Feedback Loop)**
