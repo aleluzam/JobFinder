@@ -293,9 +293,9 @@ CREATE INDEX idx_notif_user_job ON notifications_log(user_id, job_id);
   - [x] Crear modelo Pydantic `RawJob` y `NormalizedJob` con validadores de tipos:
     - Campos obligatorios: `source`, `source_id`, `title`, `description`, `original_url`.
     - Campos opcionales saneados: `company`, `province`, `city`, `salary_min`, `salary_max`, `contract_type`, `is_remote`.
-- [ ] **1.3. Conectores Modulares por Fuente (`ingestion/`)**
+- [x] **1.3. Conectores Modulares por Fuente (`ingestion/`)**
   - [x] Crear clase base abstracta `BaseJobClient` con métodos `fetch_jobs(category, province, page)`.
-  - [ ] Implementar cliente para Adzuna (`ingestion/adzuna.py`):
+  - [x] Implementar cliente para Adzuna (`ingestion/adzuna.py`):
     - Parámetros: consultas por provincia española (Madrid, Barcelona, Valencia, etc.) y categoría.
     - Control de límites de peticiones (Rate limiting con `tenacity` o `aiolimiter`).
     - Manejo de reintentos con backoff exponencial ante errores 429/5xx.
