@@ -289,8 +289,8 @@ CREATE INDEX idx_notif_user_job ON notifications_log(user_id, job_id);
   - [x] Registro en **Adzuna API** "d5435f73f7d49abffc135ec2a62721a7" (App ID y App Key para España `country=es`).
   - [x] Registro en **Jooble API** "8a404450-13a5-4980-aead-1016c9009c03" (API Key).
   - [ ] (Opcional en fase inicial) Registro de aplicación en **InfoJobs Developer Portal**.
-- [ ] **1.2. Módulo de Esquema Común (`schemas/job.py`)**
-  - [ ] Crear modelo Pydantic `RawJob` y `NormalizedJob` con validadores de tipos:
+- [x] **1.2. Módulo de Esquema Común (`schemas/job.py`)**
+  - [x] Crear modelo Pydantic `RawJob` y `NormalizedJob` con validadores de tipos:
     - Campos obligatorios: `source`, `source_id`, `title`, `description`, `original_url`.
     - Campos opcionales saneados: `company`, `province`, `city`, `salary_min`, `salary_max`, `contract_type`, `is_remote`.
 - [ ] **1.3. Conectores Modulares por Fuente (`ingestion/`)**
